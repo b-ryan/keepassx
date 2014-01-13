@@ -635,12 +635,10 @@ void DatabaseWidget::switchToImportKeepass1(const QString& fileName)
 
 void DatabaseWidget::toggleSearch()
 {
-    if (m_entryView->inEntryListMode()) {
-        closeSearch();
-    }
-    else {
+    if(!m_entryView->inEntryListMode()) {
         showSearch();
     }
+    m_searchUi->searchEdit->setFocus();
 }
 
 void DatabaseWidget::closeSearch()
@@ -683,7 +681,6 @@ void DatabaseWidget::showSearch()
 
     m_searchWidget->show();
     search();
-    m_searchUi->searchEdit->setFocus();
 }
 
 void DatabaseWidget::search()
