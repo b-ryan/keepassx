@@ -639,6 +639,10 @@ void DatabaseWidget::toggleSearch()
         showSearch();
     }
     m_searchUi->searchEdit->setFocus();
+
+    m_searchUi->searchEdit->blockSignals(true);
+    m_searchUi->searchEdit->selectAll();
+    m_searchUi->searchEdit->blockSignals(false);
 }
 
 void DatabaseWidget::closeSearch()
@@ -649,10 +653,6 @@ void DatabaseWidget::closeSearch()
 
 void DatabaseWidget::showSearch()
 {
-    m_searchUi->searchEdit->blockSignals(true);
-    m_searchUi->searchEdit->clear();
-    m_searchUi->searchEdit->blockSignals(false);
-
     m_searchUi->searchCurrentRadioButton->blockSignals(true);
     m_searchUi->searchRootRadioButton->blockSignals(true);
     m_searchUi->searchRootRadioButton->setChecked(true);
