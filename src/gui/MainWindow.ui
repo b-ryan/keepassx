@@ -128,6 +128,7 @@
     <addaction name="menuEntryCopyAttribute"/>
     <addaction name="actionEntryAutoType"/>
     <addaction name="actionEntryOpenUrl"/>
+    <addaction name="actionSearch"/>
    </widget>
    <widget class="QMenu" name="menuGroups">
     <property name="title">
@@ -165,13 +166,15 @@
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
-   <addaction name="actionDatabaseNew"/>
    <addaction name="actionDatabaseOpen"/>
    <addaction name="actionDatabaseSave"/>
    <addaction name="separator"/>
    <addaction name="actionEntryNew"/>
    <addaction name="actionEntryEdit"/>
    <addaction name="actionEntryDelete"/>
+   <addaction name="separator"/>
+   <addaction name="actionEntryCopyUsername"/>
+   <addaction name="actionEntryCopyPassword"/>
    <addaction name="separator"/>
    <addaction name="actionLockDatabases"/>
    <addaction name="actionSearch"/>
@@ -318,6 +321,9 @@
    <property name="text">
     <string>Username</string>
    </property>
+   <property name="toolTip">
+    <string>Copy username to clipboard</string>
+   </property>
   </action>
   <action name="actionEntryCopyPassword">
    <property name="enabled">
@@ -325,6 +331,9 @@
    </property>
    <property name="text">
     <string>Password</string>
+   </property>
+   <property name="toolTip">
+    <string>Copy password to clipboard</string>
    </property>
   </action>
   <action name="actionSettings">

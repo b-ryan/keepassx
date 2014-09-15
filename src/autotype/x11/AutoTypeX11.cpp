@@ -46,7 +46,8 @@ AutoTypePlatformX11::AutoTypePlatformX11()
 
     m_keysymTable = Q_NULLPTR;
     m_xkb = Q_NULLPTR;
-    m_specialCharacterKeycode = 0;
+    m_remapKeycode = 0;
+    m_currentRemapKeysym = NoSymbol;
     m_modifierMask = ControlMask | ShiftMask | Mod1Mask | Mod4Mask;
 
     m_loaded = true;
@@ -440,11 +441,13 @@ void AutoTypePlatformX11::updateKeymap()
             &m_keysymPerKeycode);
 
     /* determine the keycode to use for remapped keys */
-    if (m_specialCharacterKeycode == 0) {
+    inx = (m_remapKeycode - m_minKeycode) * m_keysymPerKeycode;
+    if (m_remapKeycode == 0 || !isRemapKeycodeValid()) {
         for (keycode = m_minKeycode; keycode <= m_maxKeycode; keycode++) {
             inx = (keycode - m_minKeycode) * m_keysymPerKeycode;
             if (m_keysymTable[inx] == NoSymbol) {
-               m_specialCharacterKeycode = keycode;
+               m_remapKeycode = keycode;
+               m_currentRemapKeysym = NoSymbol;
                break;
             }
         }
@@ -463,6 +466,18 @@ void AutoTypePlatformX11::updateKeymap()
         }
     }
     XFreeModifiermap(modifiers);
+}
+
+bool AutoTypePlatformX11::isRemapKeycodeValid()
+{
+    int baseKeycode = (m_remapKeycode - m_minKeycode) * m_keysymPerKeycode;
+    for (int i = 0; i < m_keysymPerKeycode; i++) {
+        if (m_keysymTable[baseKeycode + i] == m_currentRemapKeysym) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void AutoTypePlatformX11::startCatchXErrors()
@@ -505,14 +520,17 @@ int AutoTypePlatformX11::x11ErrorHandler(Display* display, XErrorEvent* error)
  */
 int AutoTypePlatformX11::AddKeysym(KeySym keysym)
 {
-    if (m_specialCharacterKeycode == 0) {
+    if (m_remapKeycode == 0) {
         return 0;
     }
 
-    int inx = (m_specialCharacterKeycode - m_minKeycode) * m_keysymPerKeycode;
+    int inx = (m_remapKeycode- m_minKeycode) * m_keysymPerKeycode;
     m_keysymTable[inx] = keysym;
-    XChangeKeyboardMapping(m_dpy, m_specialCharacterKeycode, m_keysymPerKeycode, &m_keysymTable[inx], 1);
+    m_currentRemapKeysym = keysym;
+
+    XChangeKeyboardMapping(m_dpy, m_remapKeycode, m_keysymPerKeycode, &m_keysymTable[inx], 1);
     XFlush(m_dpy);
+    updateKeymap();
 
     /* Xlib needs some time until the mapping is distributed to 
        all clients */
@@ -521,7 +539,7 @@ int AutoTypePlatformX11::AddKeysym(KeySym keysym)
     ts.tv_nsec = 10 * 1000 * 1000;
     nanosleep(&ts, Q_NULLPTR);
 
-    return m_specialCharacterKeycode;
+    return m_remapKeycode;
 }
 
 /*
@@ -564,30 +582,43 @@ void AutoTypePlatformX11::SendModifier(XKeyEvent *event, unsigned int mask, int 
  * Determines the keycode and modifier mask for the given
  * keysym.
  */
-int AutoTypePlatformX11::GetKeycode(KeySym keysym, unsigned int *mask) 
+int AutoTypePlatformX11::GetKeycode(KeySym keysym, unsigned int *mask)
+{
+    int keycode = XKeysymToKeycode(m_dpy, keysym);
+
+    if (keycode && keysymModifiers(keysym, keycode, mask)) {
+        return keycode;
+    }
+
+    /* no modifier matches => resort to remapping */
+    keycode = AddKeysym(keysym);
+    if (keycode && keysymModifiers(keysym, keycode, mask)) {
+        return keycode;
+    }
+
+    *mask = 0;
+    return 0;
+}
+
+bool AutoTypePlatformX11::keysymModifiers(KeySym keysym, int keycode, unsigned int *mask)
 {
     int shift, mod;
     unsigned int mods_rtrn;
-    KeySym keysym_rtrn;
-    int keycode;
-
-    keycode = XKeysymToKeycode(m_dpy, keysym);
 
     /* determine whether there is a combination of the modifiers
        (Mod1-Mod5) with or without shift which returns keysym */
     for (shift = 0; shift < 2; shift ++) {
         for (mod = ControlMapIndex; mod <= Mod5MapIndex; mod ++) {
+            KeySym keysym_rtrn;
             *mask = (mod == ControlMapIndex) ? shift : shift | (1 << mod);
             XkbTranslateKeyCode(m_xkb, keycode, *mask, &mods_rtrn, &keysym_rtrn);
             if (keysym_rtrn == keysym) {
-                return keycode;
+                return true;
             }
         }
     }
 
-    /* no modifier matches => resort to remapping */
-    *mask = 0;
-    return AddKeysym(keysym);
+    return false;
 }
 
 
@@ -609,6 +640,8 @@ void AutoTypePlatformX11::SendKeyPressedEvent(KeySym keysym)
         return;
     }
 
+    XGetInputFocus(m_dpy, &cur_focus, &revert_to);
+
     event.display = m_dpy;
     event.window = cur_focus;
     event.root = m_rootWindow;
@@ -627,7 +660,6 @@ void AutoTypePlatformX11::SendKeyPressedEvent(KeySym keysym)
 
     XQueryPointer(m_dpy, event.root, &root, &child, &root_x, &root_y, &x, &y, &mask);
     saved_mask = mask;
-    XGetInputFocus(m_dpy, &cur_focus, &revert_to);
 
     /* determine keycode and mask for the given keysym */
     keycode = GetKeycode(keysym, &mask);

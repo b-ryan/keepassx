@@ -21,6 +21,7 @@
 
 #include "autotype/AutoType.h"
 #include "core/Config.h"
+#include "core/Translator.h"
 
 SettingsWidget::SettingsWidget(QWidget* parent)
     : EditWidget(parent)
@@ -28,6 +29,8 @@ SettingsWidget::SettingsWidget(QWidget* parent)
     , m_generalWidget(new QWidget())
     , m_secUi(new Ui::SettingsWidgetSecurity())
     , m_generalUi(new Ui::SettingsWidgetGeneral())
+    , m_globalAutoTypeKey(static_cast<Qt::Key>(0))
+    , m_globalAutoTypeModifiers(Qt::NoModifier)
 {
     setHeadline(tr("Application Settings"));
 
@@ -47,6 +50,8 @@ SettingsWidget::SettingsWidget(QWidget* parent)
 
     connect(m_secUi->clearClipboardCheckBox, SIGNAL(toggled(bool)),
             m_secUi->clearClipboardSpinBox, SLOT(setEnabled(bool)));
+    connect(m_secUi->lockDatabaseIdleCheckBox, SIGNAL(toggled(bool)),
+            m_secUi->lockDatabaseIdleSpinBox, SLOT(setEnabled(bool)));
 }
 
 SettingsWidget::~SettingsWidget()
@@ -62,6 +67,18 @@ void SettingsWidget::loadSettings()
     m_generalUi->autoSaveAfterEveryChangeCheckBox->setChecked(config()->get("AutoSaveAfterEveryChange").toBool());
     m_generalUi->autoSaveOnExitCheckBox->setChecked(config()->get("AutoSaveOnExit").toBool());
     m_generalUi->minimizeOnCopyCheckBox->setChecked(config()->get("MinimizeOnCopy").toBool());
+    m_generalUi->useGroupIconOnEntryCreationCheckBox->setChecked(config()->get("UseGroupIconOnEntryCreation").toBool());
+    m_generalUi->autoTypeEntryTitleMatchCheckBox->setChecked(config()->get("AutoTypeEntryTitleMatch").toBool());
+
+    m_generalUi->languageComboBox->clear();
+    QList<QPair<QString, QString> > languages = Translator::availableLanguages();
+    for (int i = 0; i < languages.size(); i++) {
+        m_generalUi->languageComboBox->addItem(languages[i].second, languages[i].first);
+    }
+    int defaultIndex = m_generalUi->languageComboBox->findData(config()->get("GUI/Language"));
+    if (defaultIndex > 0) {
+        m_generalUi->languageComboBox->setCurrentIndex(defaultIndex);
+    }
 
     if (autoType()->isAvailable()) {
         m_globalAutoTypeKey = static_cast<Qt::Key>(config()->get("GlobalAutoTypeKey").toInt());
@@ -74,23 +91,47 @@ void SettingsWidget::loadSettings()
     m_secUi->clearClipboardCheckBox->setChecked(config()->get("security/clearclipboard").toBool());
     m_secUi->clearClipboardSpinBox->setValue(config()->get("security/clearclipboardtimeout").toInt());
 
+    m_secUi->lockDatabaseIdleCheckBox->setChecked(config()->get("security/lockdatabaseidle").toBool());
+    m_secUi->lockDatabaseIdleSpinBox->setValue(config()->get("security/lockdatabaseidlesec").toInt());
+
+    m_secUi->passwordCleartextCheckBox->setChecked(config()->get("security/passwordscleartext").toBool());
+
+    m_secUi->autoTypeAskCheckBox->setChecked(config()->get("security/autotypeask").toBool());
+
     setCurrentRow(0);
 }
 
 void SettingsWidget::saveSettings()
 {
     config()->set("RememberLastDatabases", m_generalUi->rememberLastDatabasesCheckBox->isChecked());
-    config()->set("OpenPreviousDatabasesOnStartup", m_generalUi->openPreviousDatabasesOnStartupCheckBox->isChecked());
-    config()->set("ModifiedOnExpandedStateChanges", m_generalUi->modifiedExpandedChangedCheckBox->isChecked());
-    config()->set("AutoSaveAfterEveryChange", m_generalUi->autoSaveAfterEveryChangeCheckBox->isChecked());
+    config()->set("OpenPreviousDatabasesOnStartup",
+                  m_generalUi->openPreviousDatabasesOnStartupCheckBox->isChecked());
+    config()->set("ModifiedOnExpandedStateChanges",
+                  m_generalUi->modifiedExpandedChangedCheckBox->isChecked());
+    config()->set("AutoSaveAfterEveryChange",
+                  m_generalUi->autoSaveAfterEveryChangeCheckBox->isChecked());
     config()->set("AutoSaveOnExit", m_generalUi->autoSaveOnExitCheckBox->isChecked());
     config()->set("MinimizeOnCopy", m_generalUi->minimizeOnCopyCheckBox->isChecked());
+    config()->set("UseGroupIconOnEntryCreation",
+                  m_generalUi->useGroupIconOnEntryCreationCheckBox->isChecked());
+    config()->set("AutoTypeEntryTitleMatch",
+                  m_generalUi->autoTypeEntryTitleMatchCheckBox->isChecked());
+    int currentLangIndex = m_generalUi->languageComboBox->currentIndex();
+    config()->set("GUI/Language", m_generalUi->languageComboBox->itemData(currentLangIndex).toString());
     if (autoType()->isAvailable()) {
         config()->set("GlobalAutoTypeKey", m_generalUi->autoTypeShortcutWidget->key());
-        config()->set("GlobalAutoTypeModifiers", static_cast<int>(m_generalUi->autoTypeShortcutWidget->modifiers()));
+        config()->set("GlobalAutoTypeModifiers",
+                      static_cast<int>(m_generalUi->autoTypeShortcutWidget->modifiers()));
     }
     config()->set("security/clearclipboard", m_secUi->clearClipboardCheckBox->isChecked());
     config()->set("security/clearclipboardtimeout", m_secUi->clearClipboardSpinBox->value());
+
+    config()->set("security/lockdatabaseidle", m_secUi->lockDatabaseIdleCheckBox->isChecked());
+    config()->set("security/lockdatabaseidlesec", m_secUi->lockDatabaseIdleSpinBox->value());
+
+    config()->set("security/passwordscleartext", m_secUi->passwordCleartextCheckBox->isChecked());
+
+    config()->set("security/autotypeask", m_secUi->autoTypeAskCheckBox->isChecked());
 
     Q_EMIT editFinished(true);
 }

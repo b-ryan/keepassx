@@ -17,6 +17,7 @@
 
 #include "SymmetricCipher.h"
 
+#include "config-keepassx.h"
 #include "crypto/SymmetricCipherGcrypt.h"
 #include "crypto/SymmetricCipherSalsa20.h"
 
@@ -24,7 +25,6 @@ SymmetricCipher::SymmetricCipher(SymmetricCipher::Algorithm algo, SymmetricCiphe
                                  SymmetricCipher::Direction direction, const QByteArray& key, const QByteArray& iv)
     : m_backend(createBackend(algo, mode, direction))
 {
-    m_backend->init();
     m_backend->setKey(key);
     m_backend->setIv(iv);
 }
@@ -39,10 +39,15 @@ SymmetricCipherBackend* SymmetricCipher::createBackend(SymmetricCipher::Algorith
     switch (algo) {
     case SymmetricCipher::Aes256:
     case SymmetricCipher::Twofish:
+#if defined(GCRYPT_HAS_SALSA20)
+    case SymmetricCipher::Salsa20:
+#endif
         return new SymmetricCipherGcrypt(algo, mode, direction);
 
+#if !defined(GCRYPT_HAS_SALSA20)
     case SymmetricCipher::Salsa20:
         return new SymmetricCipherSalsa20(algo, mode, direction);
+#endif
 
     default:
         Q_ASSERT(false);

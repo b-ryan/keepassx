@@ -72,11 +72,13 @@ private:
     static int x11ErrorHandler(Display* display, XErrorEvent* error);
 
     void updateKeymap();
+    bool isRemapKeycodeValid();
     int AddKeysym(KeySym keysym);
     void AddModifier(KeySym keysym);
     void SendEvent(XKeyEvent* event, int event_type);
     void SendModifier(XKeyEvent *event, unsigned int mask, int event_type);
     int GetKeycode(KeySym keysym, unsigned int *mask);
+    bool keysymModifiers(KeySym keysym, int keycode, unsigned int *mask);
 
     static int MyErrorHandler(Display* my_dpy, XErrorEvent* event);
 
@@ -106,8 +108,9 @@ private:
     int m_minKeycode;
     int m_maxKeycode;
     int m_keysymPerKeycode;
-    /* dedicated 'special character' keycode */
-    int m_specialCharacterKeycode;
+    /* dedicated keycode for remapped keys */
+    unsigned int m_remapKeycode;
+    KeySym m_currentRemapKeysym;
     KeyCode m_modifier_keycode[N_MOD_INDICES];
     bool m_loaded;
 };
